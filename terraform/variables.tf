@@ -66,7 +66,37 @@ variable "keycloak_machine_type" {
 }
 
 variable "vm_image" {
-  description = "Boot disk image for both VMs"
+  description = "Boot disk image for all VMs"
   type        = string
   default     = "debian-cloud/debian-12"
+}
+
+variable "postgresql_machine_type" {
+  description = "Machine type for the PostgreSQL VM"
+  type        = string
+  default     = "e2-standard-2"
+}
+
+variable "postgres_password" {
+  description = "PostgreSQL root (postgres) user password — set via TF_VAR_postgres_password"
+  type        = string
+  sensitive   = true
+}
+
+variable "keycloak_database" {
+  description = "Database name for Keycloak"
+  type        = string
+  default     = "keycloak"
+}
+
+variable "keycloak_db_user" {
+  description = "PostgreSQL user for Keycloak"
+  type        = string
+  default     = "keycloak"
+}
+
+variable "keycloak_db_password" {
+  description = "PostgreSQL password for Keycloak user — set via TF_VAR_keycloak_db_password"
+  type        = string
+  sensitive   = true
 }
