@@ -1,0 +1,15 @@
+# Dev environment — non-sensitive values only
+# Set sensitive vars via environment: export TF_VAR_keycloak_admin_password="..."
+
+project_id            = "your-gcp-project-id"
+region                = "us-central1"
+zone                  = "us-central1-a"
+environment           = "dev"
+domain                = "dev.auth.example.com"
+ssl_cert_email        = "ops@example.com"
+keycloak_admin_user   = "admin"
+nginx_machine_type    = "e2-small"
+keycloak_machine_type = "e2-medium"
+vm_image              = "debian-cloud/debian-12"
+ssh_user              = "gcpuser"
+ssh_public_key        = "ssh-rsa AAAA... your-public-key-here"
