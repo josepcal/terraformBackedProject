@@ -21,7 +21,7 @@ variable "subnet_id" {
 variable "machine_type" {
   description = "Compute Engine machine type"
   type        = string
-  default     = "e2-medium"
+  default     = "e2-standard-2"
 }
 
 variable "vm_image" {
@@ -40,30 +40,14 @@ variable "ssh_public_key" {
   type        = string
 }
 
-variable "keycloak_admin_user" {
-  description = "Keycloak admin username"
-  type        = string
-  default     = "admin"
-}
-
-variable "keycloak_admin_password" {
-  description = "Keycloak admin password"
+variable "postgres_password" {
+  description = "PostgreSQL root (postgres) user password — set via TF_VAR_postgres_password"
   type        = string
   sensitive   = true
 }
 
-variable "nginx_subnet_cidr" {
-  description = "CIDR of the public (Nginx) subnet — used only for documentation/reference"
-  type        = string
-}
-
-variable "postgresql_internal_ip" {
-  description = "Internal IP of the PostgreSQL VM"
-  type        = string
-}
-
 variable "keycloak_database" {
-  description = "PostgreSQL database name for Keycloak"
+  description = "Database name for Keycloak"
   type        = string
   default     = "keycloak"
 }
@@ -75,7 +59,12 @@ variable "keycloak_db_user" {
 }
 
 variable "keycloak_db_password" {
-  description = "PostgreSQL password for Keycloak user"
+  description = "PostgreSQL password for Keycloak user — set via TF_VAR_keycloak_db_password"
   type        = string
   sensitive   = true
+}
+
+variable "keycloak_vm_cidr" {
+  description = "CIDR range of the Keycloak VM's subnet for pg_hba.conf"
+  type        = string
 }

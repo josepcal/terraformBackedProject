@@ -61,6 +61,23 @@ resource "google_compute_firewall" "allow_keycloak_from_nginx" {
   description = "Allow Keycloak port 8080 from Nginx only — never open to internet"
 }
 
+# Allow Keycloak to reach PostgreSQL on port 5432 (internal only)
+resource "google_compute_firewall" "allow_postgresql_from_keycloak" {
+  name    = "${var.environment}-allow-postgresql-from-keycloak"
+  network = google_compute_network.vpc.name
+  project = var.project_id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["5432"]
+  }
+
+  source_tags = ["keycloak"]
+  target_tags = ["postgresql"]
+
+  description = "Allow PostgreSQL port 5432 from Keycloak only — never open to internet"
+}
+
 # SSH access — restrict source_ranges in production
 resource "google_compute_firewall" "allow_ssh" {
   name    = "${var.environment}-allow-ssh"
@@ -73,7 +90,7 @@ resource "google_compute_firewall" "allow_ssh" {
   }
 
   source_ranges = ["35.235.240.0/20"] # IAP range — use IAP for SSH instead of direct exposure
-  target_tags   = ["nginx", "keycloak"]
+  target_tags   = ["nginx", "keycloak", "postgresql"]
 
   description = "Allow SSH via IAP tunnel only"
 }

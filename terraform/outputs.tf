@@ -8,6 +8,11 @@ output "keycloak_internal_ip" {
   value       = module.keycloak.internal_ip
 }
 
+output "postgresql_internal_ip" {
+  description = "Internal IP address of the PostgreSQL VM"
+  value       = module.postgresql.internal_ip
+}
+
 output "vpc_name" {
   description = "Name of the VPC network"
   value       = module.network.vpc_name

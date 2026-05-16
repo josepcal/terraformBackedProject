@@ -73,6 +73,9 @@ locals {
     systemctl enable docker
     systemctl start docker
 
+    # Install PostgreSQL client for health checks
+    apt-get install -y postgresql-client
+
     # Write systemd unit for Keycloak
     cat > /etc/systemd/system/keycloak.service <<EOF
     [Unit]
@@ -89,6 +92,10 @@ locals {
       -p 8080:8080 \
       -e KEYCLOAK_ADMIN=${var.keycloak_admin_user} \
       -e KEYCLOAK_ADMIN_PASSWORD=${var.keycloak_admin_password} \
+      -e KC_DB=postgres \
+      -e KC_DB_URL=jdbc:postgresql://${var.postgresql_internal_ip}:5432/${var.keycloak_database} \
+      -e KC_DB_USERNAME=${var.keycloak_db_user} \
+      -e KC_DB_PASSWORD=${var.keycloak_db_password} \
       -e KC_PROXY=edge \
       -e KC_HTTP_ENABLED=true \
       quay.io/keycloak/keycloak:24.0 \
