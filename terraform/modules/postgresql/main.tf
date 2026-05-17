@@ -91,27 +91,36 @@ locals {
     apt-get update -y
     apt-get install -y postgresql postgresql-contrib
 
-    # Format and mount the persistent data disk
-    if ! lsblk | grep -q sdb; then
-      echo "Data disk not yet attached; will retry on next startup"
-      exit 0
+    # Wait up to 60s for the data disk to attach
+    for i in {1..30}; do
+      if [ -e /dev/disk/by-id/google-postgresql-data ]; then
+        DATA_DISK=/dev/disk/by-id/google-postgresql-data
+        break
+      fi
+      echo "Waiting for data disk... ($i/30)"
+      sleep 2
+    done
+
+    if [ -z "$${DATA_DISK:-}" ]; then
+      echo "ERROR: data disk never appeared, aborting"
+      exit 1
     fi
 
-    # Create partition if needed (idempotent)
-    if ! lsblk -o NAME,TYPE | grep -q "sdb.*part"; then
-      parted -s /dev/sdb mklabel gpt mkpart primary ext4 0% 100%
-      mkfs.ext4 -F /dev/sdb1
+    # Format if it doesn't already have a filesystem
+    if ! blkid "$DATA_DISK" > /dev/null 2>&1; then
+      mkfs.ext4 -F "$DATA_DISK"
     fi
 
-    # Mount the data disk
+    # Mount
     mkdir -p /data/postgresql
     if ! mount | grep -q /data/postgresql; then
-      mount /dev/sdb1 /data/postgresql
+      mount "$DATA_DISK" /data/postgresql
     fi
 
-    # Persist mount in fstab
-    if ! grep -q /data/postgresql /etc/fstab; then
-      echo "/dev/sdb1 /data/postgresql ext4 defaults,nofail 0 2" >> /etc/fstab
+    # fstab using UUID for stability
+    UUID=$(blkid -s UUID -o value "$DATA_DISK")
+    if ! grep -q "$UUID" /etc/fstab; then
+      echo "UUID=$UUID /data/postgresql ext4 defaults,nofail 0 2" >> /etc/fstab
     fi
 
     # Set permissions
@@ -127,16 +136,22 @@ locals {
       sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /data/postgresql/main
     fi
 
-    # Point postgresql.conf to new data directory
+    # ---------------------------------------------------------------
+    # IMPORTANT: On Debian/Ubuntu, PostgreSQL reads its config from
+    # /etc/postgresql/15/main/ EVEN WHEN data_directory points elsewhere.
+    # So we edit the Debian config, not the data dir config.
+    # ---------------------------------------------------------------
+
+    # Point Debian config to new data directory
     sed -i "s|data_directory = '.*'|data_directory = '/data/postgresql/main'|" /etc/postgresql/15/main/postgresql.conf
 
-    # Fix listen_addresses — replace default localhost with 0.0.0.0
+    # Fix listen_addresses in Debian config (this is what PostgreSQL ACTUALLY reads)
     sed -i "s|#listen_addresses = 'localhost'|listen_addresses = '0.0.0.0'|" /etc/postgresql/15/main/postgresql.conf
-    # In case it was already uncommented
     sed -i "s|^listen_addresses = 'localhost'|listen_addresses = '0.0.0.0'|" /etc/postgresql/15/main/postgresql.conf
 
-    # Tune PostgreSQL
-    cat >> /etc/postgresql/15/main/postgresql.conf <<EOF
+    # Tune PostgreSQL in Debian config
+    if ! grep -q "# Keycloak tuning" /etc/postgresql/15/main/postgresql.conf; then
+      cat >> /etc/postgresql/15/main/postgresql.conf <<EOF
 
 # Keycloak tuning
 max_connections = 200
@@ -144,8 +159,9 @@ shared_buffers = 256MB
 effective_cache_size = 1GB
 work_mem = 4MB
 EOF
+    fi
 
-    # Allow Keycloak VM connections in pg_hba.conf (idempotent)
+    # Allow Keycloak VM connections in Debian pg_hba.conf (idempotent)
     if ! grep -q "${var.keycloak_vm_cidr}" /etc/postgresql/15/main/pg_hba.conf; then
       cat >> /etc/postgresql/15/main/pg_hba.conf <<EOF
 # Allow connections from Keycloak VM
@@ -153,9 +169,20 @@ host    ${var.keycloak_database}    ${var.keycloak_db_user}    ${var.keycloak_vm
 EOF
     fi
 
+    # Verify configs before starting
+    echo "=== listen_addresses in Debian config ==="
+    grep listen_addresses /etc/postgresql/15/main/postgresql.conf
+
+    echo "=== pg_hba.conf entries ==="
+    grep -v "^#" /etc/postgresql/15/main/pg_hba.conf | grep -v "^$"
+
     # Start PostgreSQL with new config
     systemctl start postgresql
-    sleep 3
+    sleep 5
+
+    # Verify it's listening on 0.0.0.0
+    echo "=== Listening ports ==="
+    ss -tlnp | grep 5432
 
     # Set postgres superuser password
     sudo -u postgres psql -c "ALTER USER postgres PASSWORD '${var.postgres_password}';"
