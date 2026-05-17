@@ -22,6 +22,9 @@ module "postgresql" {
   keycloak_db_user        = var.keycloak_db_user
   keycloak_db_password    = var.keycloak_db_password
   keycloak_vm_cidr        = module.network.private_subnet_cidr
+
+  depends_on = [module.network]
+
 }
 
 module "keycloak" {
@@ -43,7 +46,8 @@ module "keycloak" {
   keycloak_db_user         = var.keycloak_db_user
   keycloak_db_password     = var.keycloak_db_password
 
-  depends_on = [module.postgresql]
+  depends_on = [module.network, module.postgresql]
+
 }
 
 module "nginx" {
@@ -61,4 +65,7 @@ module "nginx" {
   domain               = var.domain
   ssl_cert_email       = var.ssl_cert_email
   keycloak_internal_ip = module.keycloak.internal_ip
+
+  depends_on = [module.network, module.keycloak]
+
 }

@@ -99,3 +99,33 @@ Sensitive values must NOT be committed. Use `TF_VAR_*` env vars or a secrets man
 - Not running `terraform init` after adding a new module source.
 - Not setting `TF_VAR_postgres_password` and `TF_VAR_keycloak_db_password` before `terraform apply`.
 - Deleting or losing the PostgreSQL data disk without a backup — use snapshots for disaster recovery.
+
+## Documentation Quick Reference
+
+| File | Purpose | When to Read |
+|------|---------|--------------|
+| `README.md` | Complete project overview | First time setup |
+| `HTTPS_ACCESS_GUIDE.md` | Setup HTTPS via public IP (3 paths) | **After deployment** |
+| `TLS_QUICK_START.md` | Quick HTTPS reference | While implementing TLS |
+| `TLS_SETUP.md` | Detailed HTTPS troubleshooting | When HTTPS has issues |
+| `TESTING.md` | Complete testing procedures | Validating infrastructure |
+| `DEPLOYMENT_CHECKLIST.md` | 7-phase deployment validation | Phase-by-phase verification |
+| `fix_tls.sh` | Automated TLS setup script | Run: `bash fix_tls.sh dev dev.auth.example.com ops@example.com` |
+
+## Quick Path to HTTPS Access
+
+After `terraform apply`:
+
+```bash
+# Option A: Testing (5 min, no domain needed)
+bash fix_tls.sh dev dev.auth.example.com ops@example.com
+curl -k -I https://$(terraform -chdir=terraform output -raw nginx_external_ip)/
+
+# Option B: Production (10 min, needs domain)
+# 1. Point domain DNS A record to Nginx IP
+# 2. Wait for DNS propagation
+# 3. bash fix_tls.sh dev dev.auth.example.com ops@example.com
+# 4. curl -I https://dev.auth.example.com/
+```
+
+See `HTTPS_ACCESS_GUIDE.md` for full details.
