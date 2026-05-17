@@ -83,8 +83,8 @@ sudo tail -50 /var/log/nginx/error.log
 sudo certbot certonly --nginx \
   --non-interactive \
   --agree-tos \
-  --email ops@example.com \
-  --domains dev.auth.example.com
+  --email joseapelaezc@gmail.com \
+  --domains josepcalmyfirstclaudeproject.duckdns.org
 
 # Reload Nginx
 sudo systemctl reload nginx

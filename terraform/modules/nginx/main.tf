@@ -127,7 +127,7 @@ locals {
       --agree-tos \
       --email ${var.ssl_cert_email} \
       --domains ${var.domain} \
-      --redirect || true  # Allow startup to continue; re-run certbot once DNS propagates
+      --redirect 
 
     # Enable auto-renewal
     systemctl enable certbot.timer || true

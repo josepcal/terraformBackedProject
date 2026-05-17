@@ -118,36 +118,58 @@ locals {
     chown -R postgres:postgres /data/postgresql
     chmod 700 /data/postgresql
 
-    # Configure PostgreSQL to use the data disk
+    # Stop PostgreSQL before reconfiguring
     systemctl stop postgresql || true
-    rm -rf /var/lib/postgresql/15/main/*
-    sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /data/postgresql/main
 
-    # Update postgresql.conf to point to new data directory
+    # Initialize new data directory only if not already done
+    if [ ! -f /data/postgresql/main/PG_VERSION ]; then
+      rm -rf /data/postgresql/main
+      sudo -u postgres /usr/lib/postgresql/15/bin/initdb -D /data/postgresql/main
+    fi
+
+    # Point postgresql.conf to new data directory
+    sed -i "s|data_directory = '.*'|data_directory = '/data/postgresql/main'|" /etc/postgresql/15/main/postgresql.conf
+
+    # Fix listen_addresses — replace default localhost with 0.0.0.0
+    sed -i "s|#listen_addresses = 'localhost'|listen_addresses = '0.0.0.0'|" /etc/postgresql/15/main/postgresql.conf
+    # In case it was already uncommented
+    sed -i "s|^listen_addresses = 'localhost'|listen_addresses = '0.0.0.0'|" /etc/postgresql/15/main/postgresql.conf
+
+    # Tune PostgreSQL
     cat >> /etc/postgresql/15/main/postgresql.conf <<EOF
 
-# Keycloak configuration
-listen_addresses = '0.0.0.0'
+# Keycloak tuning
 max_connections = 200
 shared_buffers = 256MB
 effective_cache_size = 1GB
 work_mem = 4MB
 EOF
 
-    # Update pg_hba.conf to allow Keycloak VM connections
-    cat >> /etc/postgresql/15/main/pg_hba.conf <<EOF
+    # Allow Keycloak VM connections in pg_hba.conf (idempotent)
+    if ! grep -q "${var.keycloak_vm_cidr}" /etc/postgresql/15/main/pg_hba.conf; then
+      cat >> /etc/postgresql/15/main/pg_hba.conf <<EOF
 # Allow connections from Keycloak VM
 host    ${var.keycloak_database}    ${var.keycloak_db_user}    ${var.keycloak_vm_cidr}    md5
 EOF
+    fi
 
-    # Set postgres user password
+    # Start PostgreSQL with new config
     systemctl start postgresql
+    sleep 3
+
+    # Set postgres superuser password
     sudo -u postgres psql -c "ALTER USER postgres PASSWORD '${var.postgres_password}';"
 
-    # Create Keycloak database and user
+    # Create Keycloak database and user (idempotent)
     sudo -u postgres psql <<EOF
-CREATE DATABASE ${var.keycloak_database};
-CREATE USER ${var.keycloak_db_user} WITH PASSWORD '${var.keycloak_db_password}';
+SELECT 'CREATE DATABASE ${var.keycloak_database}' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${var.keycloak_database}')\gexec
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${var.keycloak_db_user}') THEN
+    CREATE USER ${var.keycloak_db_user} WITH PASSWORD '${var.keycloak_db_password}';
+  END IF;
+END
+\$\$;
 ALTER ROLE ${var.keycloak_db_user} SET client_min_messages TO warning;
 GRANT ALL PRIVILEGES ON DATABASE ${var.keycloak_database} TO ${var.keycloak_db_user};
 \c ${var.keycloak_database}
@@ -156,5 +178,7 @@ EOF
 
     systemctl enable postgresql
     systemctl restart postgresql
+
+    echo "PostgreSQL setup complete"
   SCRIPT
 }
