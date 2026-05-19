@@ -82,6 +82,50 @@ resource "google_compute_attached_disk" "postgresql_data" {
   device_name = "postgresql-data"
 }
 
+resource "null_resource" "postgresql_backup_on_destroy" {
+  # Re-trigger if VM changes
+  triggers = {
+    instance_id   = google_compute_instance.postgresql.id
+    db_password   = var.keycloak_db_password
+    db_name       = var.keycloak_database
+    db_user       = var.keycloak_db_user
+    zone          = var.zone
+    project_id    = var.project_id
+    instance_name = google_compute_instance.postgresql.name
+  }
+
+  
+
+  # Runs BEFORE the VM is destroyed
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      mkdir -p ./backups
+      TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+      BACKUP_FILE="./backups/${self.triggers.db_name}_$TIMESTAMP.dump"
+      
+      echo "Creating backup before destroy: $BACKUP_FILE"
+      
+      gcloud compute ssh ${self.triggers.instance_name} \
+        --zone=${self.triggers.zone} \
+        --project=${self.triggers.project_id} \
+        --tunnel-through-iap \
+        --command="sudo -u postgres pg_dump -F c ${self.triggers.db_name}" \
+        > "$BACKUP_FILE"
+      
+      if [ -s "$BACKUP_FILE" ]; then
+        echo "✓ Backup saved: $BACKUP_FILE ($(du -h " $BACKUP_FILE" | cut -f1))"
+      else
+        echo "✗ Backup failed — file is empty"
+        exit 1
+      fi
+    EOT
+
+    on_failure = continue  # don't block destroy if backup fails
+  }
+}
+
+
 locals {
   startup_script = <<-SCRIPT
     #!/bin/bash
