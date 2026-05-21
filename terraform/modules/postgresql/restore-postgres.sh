@@ -80,18 +80,39 @@ echo "  ✓ PostgreSQL is reachable"
 # Step 2 — Upload backup file to VM
 echo "[2/4] Uploading backup file to VM..."
 #gcloud compute scp "$BACKUP_FILE" \
-#  "$INSTANCE:~/restore.dump" \
+#  "$INSTANCE:/tmp/restore.dump" \
 #  --zone="$ZONE" \
 #  --project="$PROJECT_ID" \
 #  --tunnel-through-iap
+
+                echo "uploading $BACKUP_FILE"
+                # 1. Create a temporary bucket (required iam)
+				gsutil mb -p terraform-project-496514 -l us-central1 gs://terraform-project-496514-restore-tmp
+
+				# 2. Upload from local
+				gsutil cp $BACKUP_FILE \
+				  gs://terraform-project-496514-restore-tmp/
+
+				# 3. (!!!!!!required iam!!!!) Download on the VM (uses internal Google network — fast) 
+				gcloud compute ssh dev-postgresql --zone=us-central1-a --tunnel-through-iap -- \
+				  'gsutil cp gs://terraform-project-496514-restore-tmp/'$(basename $BACKUP_FILE)' /tmp/restore.dump && sudo chown postgres:postgres /tmp/restore.dump'
+
+				# 4. Restore
+				gcloud compute ssh dev-postgresql --zone=us-central1-a --tunnel-through-iap -- \
+				  'sudo -u postgres pg_restore --clean --if-exists --no-owner --no-privileges -d keycloak /tmp/restore.dump'
+
+				# 5. Cleanup
+				gsutil rm gs://terraform-project-496514-restore-tmp/$(basename $BACKUP_FILE)
+				gsutil rb gs://terraform-project-496514-restore-tmp
+
 echo "  ✓ Uploaded"
 
-gcloud compute ssh "$INSTANCE" \
-  --zone="$ZONE" \
-  --project="$PROJECT_ID" \
-  --tunnel-through-iap \
-  --command="cp ~/restore.dump /tmp/restore.dump" \
-  || echo "   restore.dmp moved to /tmp/restore.dump (may already exist)"
+#gcloud compute ssh "$INSTANCE" \
+#  --zone="$ZONE" \
+#  --project="$PROJECT_ID" \
+#  --tunnel-through-iap \
+#  --command="cp ~/restore.dump /tmp/restore.dump" \
+#  || echo "   restore.dmp moved to /tmp/restore.dump (may already exist)"
 
 # Step 3 — Run pg_restore
 echo "[3/4] Restoring database..."
