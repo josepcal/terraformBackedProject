@@ -16,6 +16,12 @@ resource "google_project_iam_member" "postgresql_monitoring" {
   member  = "serviceAccount:${google_service_account.postgresql.email}"
 }
 
+resource "google_project_iam_member" "postgresql_storage" {
+  project = var.project_id
+  role    = "roles/storage.objectViewer"
+  member  = "serviceAccount:${google_service_account.postgresql.email}"
+}
+
 resource "google_compute_instance" "postgresql" {
   name         = "${var.environment}-postgresql"
   machine_type = var.machine_type
@@ -93,8 +99,6 @@ resource "null_resource" "postgresql_backup_on_destroy" {
     project_id    = var.project_id
     instance_name = google_compute_instance.postgresql.name
   }
-
-  
 
   # Runs BEFORE the VM is destroyed
   provisioner "local-exec" {
