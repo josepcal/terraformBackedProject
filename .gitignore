@@ -19,3 +19,8 @@ crash.*.log
 .DS_Store
 .idea/
 *.swp
+
+backups/
+
+node_modules/
+.env

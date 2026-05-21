@@ -8,7 +8,7 @@ const app = express();
 const PORT = 3000;
 
 // Keycloak configuration
-const KEYCLOAK_URL = 'https://104.155.154.161';
+const KEYCLOAK_URL = 'https://35.232.218.247';
 const REALM = 'myapp';
 const CLIENT_ID = 'test-app';
 const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET || '';

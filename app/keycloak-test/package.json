@@ -4,12 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node --loader ts-node/esm src/server.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -17,7 +18,7 @@
     "express-session": "^1.19.0",
     "jsonwebtoken": "^9.0.3",
     "jwks-rsa": "^4.0.1",
-    "openid-client": "^5.7.1"
+    "openid-client": "^6.8.4"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -26,5 +27,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
-  }
+  }    
 }
+

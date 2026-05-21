@@ -84,7 +84,7 @@ else
     echo ""
     
     # Generate self-signed certificate
-    $SSH_CMD << 'EOF'
+    $SSH_CMD << EOF
         set -e
         echo "Generating self-signed certificate..."
         
@@ -92,12 +92,14 @@ else
         sudo mkdir -p /etc/nginx/ssl
         
         # Generate certificate
-        sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-            -keyout /etc/nginx/ssl/nginx-selfsigned.key \
-            -out /etc/nginx/ssl/nginx-selfsigned.crt \
-            -subj "/C=US/ST=State/L=City/O=Organization/CN=dev.auth.example.com"
+        sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \\
+            -keyout /etc/nginx/ssl/nginx-selfsigned.key \\
+            -out /etc/nginx/ssl/nginx-selfsigned.crt \\
+            -subj "/C=US/ST=State/L=City/O=Organization/CN=$NGINX_IP" \\
+            -addext "subjectAltName=IP:$NGINX_IP"
         
         echo "✓ Self-signed certificate created"
+        sudo openssl x509 -in /etc/nginx/ssl/nginx-selfsigned.crt -noout -subject -ext subjectAltName
         ls -la /etc/nginx/ssl/
 EOF
     

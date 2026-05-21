@@ -1,16 +1,73 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import session from 'express-session';
 import jwksClient from 'jwks-rsa';
 import { createTestUIRouter } from './routes/test-ui';
 import { createLoginRouter } from './routes/login';
 import 'dotenv/config';
 
+import { initOIDC } from './auth/oidc.js';
+import { createAuthRouter } from './routes/auth.js';
+import { createSecureActionRouter } from './routes/secure-action.js';
+
+import { createTestPkceRouter } from './routes/test-pkce.js';
+
+// ... after the other app.use(...) router mounts:
+
 const app = express();
 const PORT = 4000;
 
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+
+// CORS — must allow credentials so the session cookie flows
+app.use(cors({ origin: FRONTEND_URL, credentials: true }));
+app.use(express.json());
+
+// Test PKCE flow with a simple frontend
+app.use('/', createTestPkceRouter({
+  bffBase: process.env.BFF_BASE || 'http://localhost:4000',
+}));
+
+// Session — stores tokens server-side
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change-me-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: false,      // set true behind HTTPS in production
+    sameSite: 'lax',
+    maxAge: 1000 * 60 * 60,  // 1 hour
+  },
+}));
+
+app.get('/health', (_, res) => res.json({ status: 'ok' }));
+
+// Mount routers
+app.use('/', createAuthRouter());
+app.use('/', createSecureActionRouter());
+
+// Boot — initialize OIDC before accepting requests
+initOIDC()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✓ BFF running at http://localhost:${PORT}`);
+      console.log(`  Login:  GET  /auth/login`);
+      console.log(`  Me:     GET  /auth/me`);
+      console.log(`  Logout: GET  /auth/logout`);
+      console.log(`  Secure: POST /mysecureaction`);
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize OIDC:', err);
+    process.exit(1);
+  });
+/**
+
 // Keycloak configuration
-const KEYCLOAK_URL = 'https://104.155.154.161';
+const KEYCLOAK_URL = process.env.KEYCLOAK_URL;
 const REALM = 'myapp';
 const REQUIRED_ROLE = 'grantedrole';
 const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET || '';
@@ -147,3 +204,4 @@ app.listen(PORT, () => {
   console.log(`  Auth:   GET  /me`);
   console.log(`  Role:   POST /mysecureaction  (requires role '${REQUIRED_ROLE}')`);
 });
+        */
